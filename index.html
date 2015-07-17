@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+circle {
+  stroke: #fff;
+}
+
+</style>
+<body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
+
+<script>
+
+// Type
+// Incedence
+// Total Users
+// Toatl Passed
+// Total Failed
+// pass[a, b, c]
+// fail[a, b, c]
+// total[a, b, c]
+// title[a, b, c]
+
+function Question(text, type, answers) {
+	this.text = text;
+	this.type = type;
+	this.answers = answers;
+}
+
+function Answer(pass, fail, total, title, sequenceNumber) {
+	this.pass = pass;
+	this.fail = fail;
+	this.total = total;
+	this.label = title;
+	this.sequenceNumber = sequenceNumber;
+}
+
+var questions = []
+
+function createSampleQuestions() {
+	tempAnswers1 = []
+	tempAnswers1.push(new Answer(10, 30, 45, "Red", 1));
+	tempAnswers1.push(new Answer(20, 14, 34, "Green", 2));
+	tempAnswers1.push(new Answer(8, 7, 15, "Blue", 3));
+	questions.push(new Question("What is your favourite color?", "single-select", tempAnswers1));
+
+	tempAnswers2 = []
+	tempAnswers2.push(new Answer(54, 17, 71, "Chipotle", 1));
+	tempAnswers2.push(new Answer(8, 14, 22, "GutCheck", 2));
+	tempAnswers2.push(new Answer(4, 7, 11, "Microsoft", 3));
+	tempAnswers2.push(new Answer(18, 23, 14, "Google", 4));
+	tempAnswers2.push(new Answer(33, 23, 56, "Dave Industries", 5));
+	questions.push(new Question("What company do you work for?", "multi-select", tempAnswers2));
+
+	tempAnswers3 = []
+	tempAnswers3.push(new Answer(4, 12, 16, "Bud Light", 1));
+	tempAnswers3.push(new Answer(30, 14, 44, "White Rascal", 2));
+	tempAnswers3.push(new Answer(12, 7, 19, "Hop Abomination", 3));
+	tempAnswers3.push(new Answer(1, 23, 24, "Busch Light", 4));
+	questions.push(new Question("What is the best kind of beer?", "multi-select", tempAnswers3));
+
+	
+}
+createSampleQuestions();
+
+
+var totals = [20,15,50, 33];
+var passes = [10, 4, 5];
+var fails = [3, 2, 5];
+
+var labels = ['Pony', 'Really really really long answer', 'Chocolate', 'Dave'];
+
+var totalUsersCount = 100;
+var totalFailedCount = 50;
+var totalPassedCount = 35;
+var incidence = 32;
+
+var width = 1200,
+	height = 1000,
+	barChartWidth = 200,
+	barChartHeight = 200;
+
+var pieRadius = 95;
+
+var totalX = 400,
+	totalY = 100,
+	passX = 100,
+	passY = 430,
+	failX = 400,
+	failY = 430,
+	headerX = (width / 3) - 90,
+	headerY = 10,
+	legendX = 100,
+	legendY = 675,
+	rightPanelX = 700,
+	rightPanelY = 100;
+	
+
+var totalDomainX = d3.scale.ordinal()
+	.rangeRoundBands([0, barChartWidth], .1);
+
+var totalDomainY = d3.scale.linear()
+	.range([barChartHeight, 0]);
+
+var passDomainX = d3.scale.ordinal()
+	.rangeRoundBands([0, barChartWidth], .1);
+
+var passDomainY = d3.scale.linear()
+	.range([barChartHeight, 0]);
+
+var failDomainX = d3.scale.ordinal()
+	.rangeRoundBands([0, barChartWidth], .1);
+
+var failDomainY = d3.scale.linear()
+	.range([barChartHeight, 0]);
+
+
+
+
+
+var svg = d3.select("body").append("svg")
+	.attr("width", width)
+	.attr("height", height)
+
+var colors = d3.scale.category10();
+
+var pieColors = ["green", "red"]
+
+var pieLayout = d3.layout.pie()
+	.sort(null);
+
+var pieArc = d3.svg.arc()
+	.innerRadius(0)
+	.outerRadius(pieRadius)
+
+// for recomputing angles
+function arcTween(a) {
+  var i = d3.interpolate(this._current, a);
+  this._current = i(0);
+  return function(t) {
+    return pieArc(i(t));
+  };
+}
+
+
+//******************************************************************
+// Overall element grouping
+//******************************************************************
+var pieG = svg.append("g")
+	.attr("transform", "translate(200,200)")
+
+var totalG = svg.append("g")
+	.attr("transform", "translate(" + totalX + ", " + totalY + ")");
+
+var passG = svg.append("g")
+	.attr("transform", "translate(" + passX + ", " + passY + ")");
+
+var failG = svg.append("g")
+	.attr("transform", "translate(" + failX + ", " + failY + ")");
+
+var headerG = svg.append("g")
+	.attr("transform", "translate(" + headerX + ", " + headerY + ")");
+
+var legendG = svg.append("g")
+	.attr("transform", "translate(" + legendX + ", " + legendY + ")");
+
+var questionListG = svg.append("g")
+	.attr("transform", "translate(" + rightPanelX + ", " + rightPanelY + ")"); 
+
+
+//******************************************************************
+// Question List Right Panel
+//******************************************************************
+
+var questionListText = questionListG.selectAll(".question")
+	.data(questions)
+  .enter().append("text")
+  	.attr("class", "queston")
+  	.attr("font-size", "25px")
+  	.attr("font-weight", "bold")
+  	.attr("y", function(d, i) { return i * 70; })
+  	.text(function(d, i) { return (i+1) + ": " + d.text; })
+  	.on("click", function(d, i) { 
+  		update(questions[i]);
+  		return;
+  	})
+  	
+
+var dividerBar = questionListG.append("rect")
+	.attr("fill", "teal")
+	.attr("fill-opacity", 0.35)
+	.attr("width", 10)
+	.attr("height", height)
+	.attr("x", -30)
+	.attr("y", -100)
+	.attr("stroke-width", 2)
+	.attr("stroke", "rgb(0,0,0)")
+
+
+//******************************************************************
+// Pie Chart initialization
+//******************************************************************
+
+var piePath = pieG.selectAll("#customPie")
+			.data(pieLayout([100, 1]))
+		  .enter().append("path")
+		  	.attr("id", "customPie")
+		  	.attr("fill", function(d, i) { return pieColors[i]; })
+		  	.attr("d", pieArc)
+		  	.each(function(d) { this._current = d; })
+		  	.attr("fill-opacity", 0.65)
+			.attr("stroke-width", 5)
+			.attr("stroke", "rgb(0,0,0)");
+
+
+//******************************************************************
+// Update all charts
+//******************************************************************
+function update(question) {
+
+	// prevent text from stacking
+	svg.selectAll(".title").remove();
+
+	passes = []
+	fails = []
+	totals = []
+	labels = []
+	
+	// used to ensure consistency across the ordinal x scale
+	indexes = []
+
+	totalUsersCount = 0;
+	totalFailedCount = 0;
+	totalPassedCount = 0;
+	incidence = 0;
+
+	for (var i=0; i<question.answers.length; i++) {
+		var answer = question.answers[i]; 
+		passes.push(answer.pass);
+		totalPassedCount += answer.pass;
+
+		fails.push(answer.fail);
+		totalFailedCount += answer.fail;
+
+		totals.push(answer.total)
+		totalUsersCount += answer.total;
+
+		labels.push(answer.label);
+		indexes.push(i);
+	}
+
+	incidence = ((parseFloat(totalPassedCount)/parseFloat(totalPassedCount + totalFailedCount)) * 100).toFixed(2)
+
+	//totalDomainX.domain(totals.map(function(d) {return d; }));
+	totalDomainX.domain(indexes.map(function(d) { return d; }));
+	totalDomainY.domain([0, d3.max(totals, function(d) { return d; } )]);
+
+	passDomainX.domain(indexes.map(function(d) { return d; }));
+	passDomainY.domain([0, d3.max(passes, function(d) { return d; } )]);
+
+	failDomainX.domain(indexes.map(function(d) { return d; }));
+	failDomainY.domain([0, d3.max(fails, function(d) { return d; } )]);
+
+	//******************************************************************
+	// Header Elements
+	//******************************************************************
+	var incidenceText = headerG.append("text")
+		.text("Incidence: " + incidence + "%")
+		.attr("y", +20)
+		.attr("x", -100)
+		.attr("font-weight", "bold")
+		.attr("font-size", "23px")
+		.attr("class", "title")
+
+	var questionTypeText = headerG.append("text")
+		.text(question.type)
+		.attr("y", +45)
+		.attr("x", -50)
+		.attr("font-weight", "bold")
+		.attr("font-size", "16px")
+		.attr("class", "title")
+
+	//******************************************************************
+	// Legend Elements
+	//******************************************************************
+	
+	// Data join
+	var legendEntry = legendG.selectAll(".legendEntry")
+		.data(labels, function(d) { return d; })
+	  
+	// Update
+	legendEntry
+
+	// Enter
+	legendEntry.enter().append("g")
+	  	.attr("class", "legendEntry")
+
+	// Exit
+	legendEntry.exit().remove()
+
+	var legendText = legendEntry.append("text")
+		.text(function(d) { return d; })
+		.attr("y", function(d, i) { return +(i*30); })
+		.attr("x", +20)
+		.attr("font-weight", "bold")
+
+	var legendRect = legendEntry.append("rect")
+		.attr("width", 20)
+		.attr("height", 20)
+		.attr("y", function(d, i) { return +(i*30) - 15; })
+		.attr("x", -10)
+		.attr("fill", function(d, i) { return colors(i); })
+		.attr("fill-opacity", .5)
+		.attr("stroke-width", 2)
+		.attr("stroke", "rgb(0,0,0)");
+	  
+
+	//******************************************************************
+	// Custom Pie chart
+	//******************************************************************
+	
+
+	piePath
+		.data(pieLayout([totalPassedCount, totalFailedCount]))
+		.attr("fill", function(d, i) { return pieColors[i]; })
+		.attr("fill-opacity", 0.65)
+		.attr("stroke-width", 5)
+		.attr("stroke", "rgb(0,0,0)")
+
+			
+	piePath.transition()
+		.duration(500)
+		.attrTween("d", arcTween)
+
+	// Update
+	// piePath
+	// 	.data(pieLayout[totalPassedCount, totalFailedCount])
+	// 	.attr("fill-opacity", 0.65)
+	// 	.attr("stroke-width", 5)
+	// 	.attr("stroke", "rgb(0,0,0)")
+	// 	.attr("fill", function(d, i) { return pieColors[i]; })
+
+
+
+	
+
+
+
+	var pieTitle = pieG.append("text")
+
+	setDefaultTitleAttr(pieTitle, "Pass / Fail")
+	pieTitle
+		.attr("x", -pieRadius + 30)
+		.attr("y", -pieRadius - 20)
+
+	var totalUsersText = pieG.append("text")
+		.text("Total Users: " + totalUsersCount)
+		.attr("x", -pieRadius + 10)
+		.attr("y", +pieRadius + 20)
+		.attr("font-weight", "bold")
+		.attr("class", "title")
+
+	var totalPassedText = pieG.append("text")
+		.text("Total Passed: " + totalPassedCount)
+		.attr("x", -pieRadius + 10)
+		.attr("y", +pieRadius + 40)
+		.attr("font-weight", "bold")
+		.attr("class", "title")
+
+	var totalFailedText = pieG.append("text")
+		.text("Total Failed: " + totalFailedCount)
+		.attr("x", -pieRadius + 10)
+		.attr("y", +pieRadius + 60)
+		.attr("font-weight", "bold")
+		.attr("class", "title")
+
+
+	//******************************************************************
+	// Totals Bar chart
+	//******************************************************************
+
+	// Data Bind
+	var totalBar = totalG.selectAll(".totalBar")
+		.data(totals)
+	var totalText = totalG.selectAll(".totalText")
+		.data(totals)
+
+	// Update
+	totalBar
+
+	// Enter 
+	setDefaultBarAttr(totalBar, "totalBar", totalDomainX, totalDomainY)
+	setDefaultTextAttr(totalText, "totalText", totalDomainX, totalDomainY);
+
+	// Enter + Update
+	updateBar(totalBar, totalDomainX, totalDomainY);
+	updateText(totalText, totalDomainX, totalDomainY);
+
+	//Exit
+	totalBar.exit().remove();
+	totalText.exit().remove();
+
+
+	var totalTitle = totalG.append("text")
+	setDefaultTitleAttr(totalTitle, "Total Answers Chosen")
+
+	//******************************************************************
+	// Pass Bar chart
+	//******************************************************************
+	
+	// Data Bind
+	var passBar = passG.selectAll(".passBar")
+		.data(passes)
+	var passText = passG.selectAll(".passText")
+		.data(passes)
+
+	// Enter
+	setDefaultBarAttr(passBar, "passBar", passDomainX, passDomainY)
+	setDefaultTextAttr(passText, "passText", passDomainX, passDomainY);
+
+	// Enter + Update
+	updateBar(passBar, passDomainX, passDomainY);
+	updateText(passText, passDomainX, passDomainY);
+
+	// Exit
+	passBar.exit().remove();
+	passText.exit().remove();
+
+	var passTitle = passG.append("text")
+	setDefaultTitleAttr(passTitle, "Passing User Answers:")
+
+	//******************************************************************
+	// Fail Bar chart
+	//******************************************************************
+
+	// Data Bind
+	var failBar = failG.selectAll(".failBar")
+		.data(fails)
+	var failText = failG.selectAll(".failText")
+		.data(fails)
+
+	// Enter
+	setDefaultBarAttr(failBar, "failBar", failDomainX, failDomainY);
+	setDefaultTextAttr(failText, "failText", failDomainX, failDomainY);
+
+	// Enter + Update
+	updateBar(failBar, failDomainX, failDomainY);
+	updateText(failText, failDomainX, failDomainY);
+
+	// Exit
+	failBar.exit().remove();
+	failText.exit().remove();
+
+	var failTitle = failG.append("text")
+	setDefaultTitleAttr(failTitle, "Failing User Answers:")
+
+	//******************************************************************
+	// Helper Functions
+	//******************************************************************
+	function setDefaultBarAttr(bar, className, xDomain, yDomain) {
+		bar.enter().append("rect")
+		  .attr("class", className)
+		  .attr("x", function(d, i) { return xDomain(i); })
+		  .attr("width", xDomain.rangeBand())
+		  .attr("y", function(d) { return yDomain(d); })
+		  .attr("height", function(d) { 
+		  	if (barChartHeight - yDomain(d) == 0) {
+		  		return 5;
+		  	}
+		  	return barChartHeight - yDomain(d); })
+		  .attr("fill", function(d,i) { return colors(i); })
+		  .attr("stroke", "black")
+		  .attr("fill-opacity", .5);
+	}
+
+	function updateBar(bar, xDomain, yDomain) {
+		bar.transition()
+		  .duration(500)
+		  .attr("x", function(d, i) { return xDomain(i); })
+		  .attr("width", xDomain.rangeBand())
+		  .attr("y", function(d) { return yDomain(d); })
+		  .attr("height", function(d) { 
+		  	if (barChartHeight - yDomain(d) == 0) {
+		  		return 5;
+		  	}
+		  	return barChartHeight - yDomain(d); })
+		  .attr("fill", function(d,i) { return colors(i); })
+	}
+
+	function setDefaultTextAttr(text, className, xDomain, yDomain) {
+		text.enter().append("text")
+			.attr("class", className)
+			.attr("x", function(d, i) { return xDomain(i); })
+			.attr("y", function(d) { 
+				// make sure number is always visible
+				if ((yDomain(d) + 20) > barChartHeight) {
+					return barChartHeight-15;
+				}
+				return yDomain(d) + 20; })
+			.attr("font-size", "20px")
+			.text(function(d) { return d; })
+	}
+
+	function updateText(text, xDomain, yDomain) {
+		text.transition()
+			.duration(500)
+			.attr("x", function(d, i) { return xDomain(i) + 5; })
+			.attr("y", function(d) { 
+				// make sure number is always visible
+				if ((yDomain(d) + 20) > barChartHeight) {
+					return barChartHeight-15;
+				}
+				return yDomain(d) + 20; })
+			.attr("font-size", "20px")
+			.text(function(d) { return d; })
+	}
+
+	function setDefaultTitleAttr(text, title) {
+		text.text(title)
+			.attr("x", - 10)
+			.attr("y", -6)
+			.attr("font-size", "20px")
+			.attr("font-weight", "bold")
+			.attr("class", "title")
+	}
+
+}
+
+update(questions[0])
+
+</script>
